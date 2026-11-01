@@ -17,14 +17,12 @@
 #   2. By default, system schemas are not included when schemaname is ommitted from command line.
 #
 # call example with all parameters:
-# python pg_smartvac .py -H localhost -d mydb -U myuser -p 5432 -m public --vcpus 8 --analyze-ratio 1 --analyze-mods-ratio 1 --max-tables 1 --max-table-size-gb 200 --dryrun -v
-# python pg_smartvac.py -H ec2-100-58-59-41.compute-1.amazonaws.com -d daauosh1p2e58j -U uephptee5r4t4f -p 5432 -m public  --vcpus 8 --analyze-ratio 1 --analyze-mods-ratio 1 --max-tables 1 --max-table-size-gb 200 --dryrun -v
 # python pg_smartvac.py -H michaelv2 -d testing -U postgres -p 5418 -m public  --vcpus 2 --vacuum-ratio 1 --analyze-ratio 1 --analyze-mods-ratio 2  --max-tables 1 --max-table-size-gb 200 -k --dryrun -v
 #  where "-k" means disable page skipping, default is off
 #
 # Date Modified:
 # 2026-10-26 Original coding based on pg_vacuum.py
-# 2026-11-01 Added more functionality to mimic pg_vacuum.py
+# 2026-11-01 Added more functionality to incorporate other pg_vacuum.py features.
 #
 ##################################################################################################
 from __future__ import annotations
@@ -612,7 +610,13 @@ def main() -> int:
     }
 
     try:
-        log_event(f"INFO: {format_log_message('START', f'version={VERSION}  date={VERSION_DATE}  database={args.dbname}  host={args.host or "localhost"}  port={args.dbport}  schema={args.schema or "all-user-schemas"}  dryrun={args.dryrun}  verbose={args.verbose}')}")
+        start_message = (
+            f"version={VERSION}  date={VERSION_DATE}  database={args.dbname}  "
+            f"host={args.host or 'localhost'}  port={args.dbport}  "
+            f"schema={args.schema or 'all-user-schemas'}  "
+            f"dryrun={args.dryrun}  verbose={args.verbose}"
+        )
+        log_event(f"INFO: {format_log_message('START', start_message)}")        
 
         connection = connect(args)
         
