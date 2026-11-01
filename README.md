@@ -85,9 +85,3 @@ Display detailed table metrics and the reasons maintenance was selected.
 ## Simple Console and log file screenshots
 <img width="1759" height="100" alt="image" src="https://github.com/user-attachments/assets/b6c55f8b-463c-4710-9e30-d640991f4ee1" />
 <img width="1083" height="150" alt="image" src="https://github.com/user-attachments/assets/e5d1f67e-32ac-4b3d-a4bf-d08367e944b2" />
-
-
-
-
-
-`python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 -v --dryrun`
