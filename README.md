@@ -78,4 +78,4 @@ Force VACUUM to scan pages that would normally be skipped based on the visibilit
 
 Display detailed table metrics and the reasons maintenance was selected.
 
-`python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 -v --dryrun
+`python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 -v --dryrun`
