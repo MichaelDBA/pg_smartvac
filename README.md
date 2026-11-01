@@ -1,6 +1,6 @@
 # pg_smartvac
 
-This Python program intelligently manages PostgreSQL VACUUM, ANALYZE, and FREEZE operations based on table statistics, maintenance history, transaction ID age, and database workload.
+This Python (v3.9) program intelligently manages PostgreSQL VACUUM, ANALYZE, and FREEZE operations based on table statistics, maintenance history, transaction ID age, and database workload.
 
 Unlike traditional maintenance scripts that rely primarily on fixed schedules, `pg_smartvac` dynamically determines which tables need maintenance and defers execution when database activity is too high.
 
@@ -18,6 +18,8 @@ The first version of this program was created in October 2026, based on the orig
 Maintenance decisions are based on configurable thresholds, with a seven-day safety net to ensure that inactive tables are not overlooked.
 
 The program monitors database activity and waits for an acceptable workload window before beginning maintenance.
+
+It runs on Windows and Linux.
 
 Here are the parameters:
 
@@ -44,6 +46,8 @@ Here are the parameters:
 General syntax:
 
 `python pg_smartvac.py [options]`
+
+Don't forget to set the PGPASSWORD environment variable before executing this utility.
 
 The following examples illustrate common ways to invoke the program.
 
