@@ -45,7 +45,7 @@ Here are the parameters:
 
 General syntax:
 
-`python pg_smartvac.py [options]`
+`python pg_smartvac.py -H <dbhost>  -d <dbname> -U <dbuser> -p <dbport> --vcpus <digit> [other options]`
 
 Don't forget to set the PGPASSWORD environment variable before executing this utility.
 
