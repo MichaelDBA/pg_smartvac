@@ -4,6 +4,9 @@ This Python program intelligently manages PostgreSQL VACUUM, ANALYZE, and FREEZE
 
 Unlike traditional maintenance scripts that rely primarily on fixed schedules, `pg_smartvac` dynamically determines which tables need maintenance and defers execution when database activity is too high.
 
+(c) 2026 SQLEXEC LLC
+<br/>
+
 ## History
 
 The first version of this program was created in October 2026, based on the original `pg_vacuum.py` utility.
