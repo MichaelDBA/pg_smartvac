@@ -26,7 +26,6 @@
 # 2026-10-26 Original coding based on pg_vacuum.py
 # 2026-11-01 Added more functionality to mimic pg_vacuum.py
 #
-#
 ##################################################################################################
 from __future__ import annotations
 
