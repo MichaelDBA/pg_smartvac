@@ -83,6 +83,6 @@ Display detailed table metrics and the reasons maintenance was selected.
 
 
 ## Simple Console and log file screenshots
-<img width="1387" height="54" alt="image" src="https://github.com/user-attachments/assets/3d7d2820-37d9-47d9-b399-352904a3af1a" />
+<img width="1083" height="150" alt="image" src="https://github.com/user-attachments/assets/3d7d2820-37d9-47d9-b399-352904a3af1a" />
 
 <img width="1083" height="150" alt="image" src="https://github.com/user-attachments/assets/e5d1f67e-32ac-4b3d-a4bf-d08367e944b2" />
