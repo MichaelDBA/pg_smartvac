@@ -57,7 +57,7 @@ General syntax:
 
 `python pg_smartvac.py -H <dbhost>  -d <dbname> -U <dbuser> -p <dbport> --vcpus <digit> [other options]`
 
-Don't forget to set the PGPASSWORD environment variable before executing this utility.
+The default settings are normally fine.  Also, don't forget to set the PGPASSWORD environment variable before executing this utility.
 
 The following examples illustrate common ways to invoke the program.
 
