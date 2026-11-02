@@ -19,7 +19,7 @@ Maintenance decisions are based on configurable thresholds, with a seven-day saf
 
 The program monitors database activity and waits for an acceptable workload window before beginning maintenance.
 
-It runs on Windows and Linux and logs run information to the pg_smartvac.log file in the same directory from which this utility is invoked.
+It runs on Windows and Linux and logs run information to the *pg_smartvac.log* file in the same directory from which this utility is invoked.
 
 Here are the parameters:
 
