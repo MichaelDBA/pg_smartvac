@@ -98,5 +98,6 @@ Display detailed table metrics and the reasons maintenance was selected.
 
 ## Sample Console and log file screenshots
 <img width="1302" height="77" alt="image" src="https://github.com/user-attachments/assets/7e8f7582-658d-488c-867c-d779b8771725" />
-
+<br/>
+<br/>
 <img width="1083" height="150" alt="image" src="https://github.com/user-attachments/assets/e5d1f67e-32ac-4b3d-a4bf-d08367e944b2" />
