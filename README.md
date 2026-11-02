@@ -41,6 +41,16 @@ Here are the parameters:
 | `-v --verbose` | Enable detailed logging |
 | `--version` | Display program version |
 
+## Cron Setup Example
+This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives GoApron runs at:
+- 6:15 AM
+- 12:45 PM
+- 6:15 PM
+- 10:45 PM
+  
+15 6,18 * * * /usr/bin/python3 /path/to/pg_smartvac.py [arguments] >> /var/log/pg_smartvac_cron.log 2>&1
+45 12,22 * * * /usr/bin/python3 /path/to/pg_smartvac.py [arguments] >> /var/log/pg_smartvac_cron.log 2>&1
+
 ## Invocation
 
 General syntax:
