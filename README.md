@@ -13,7 +13,7 @@ The first version of this program was created in October 2026, based on the orig
 
 ## Overview
 
-`pg_smartvac` is designed to complement PostgreSQL autovacuum by identifying tables that need additional maintenance. It evaluates table statistics and maintenance history to determine when VACUUM, ANALYZE, or FREEZE operations should be performed.  The defaults for the parameters if not specified are fairly aggressive.  Consider providing those parameters with different values to decreaase or increase the thresholds.
+`pg_smartvac` is designed to complement PostgreSQL autovacuum by identifying tables that need additional maintenance. It evaluates table statistics and maintenance history to determine when VACUUM, ANALYZE, or FREEZE operations should be performed.  The defaults for the parameters if not specified are fairly aggressive.  Consider providing those parameters with different values to decrease or increase the thresholds.
 
 Maintenance decisions are based on configurable thresholds, with a seven-day safety net to ensure that inactive tables are not overlooked.
 
