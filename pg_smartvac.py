@@ -17,12 +17,12 @@
 #   2. By default, system schemas are not included when schemaname is ommitted from command line.
 #
 # call example with all parameters:
-# python pg_smartvac.py -H michaelv2 -d testing -U postgres -p 5418 -m public  --vcpus 2 --vacuum-ratio 1 --analyze-ratio 1 --analyze-mods-ratio 2  --max-tables 1 --max-table-size-gb 200 -k --dryrun -v
-#  where "-k" means disable page skipping, default is off
+# python pg_smartvac .py -H localhost -d mydb -U myuser -p 5432 -m public --vcpus 8 --analyze-ratio 1 --analyze-mods-ratio 1 --max-tables 1 --max-table-size-gb 200 --dryrun -v
 #
 # Date Modified:
 # 2026-10-26 Original coding based on pg_vacuum.py
-# 2026-11-01 Added more functionality to incorporate other pg_vacuum.py features.
+# 2026-11-02 Added more functionality to incorporate other pg_vacuum.py features.
+#
 #
 ##################################################################################################
 from __future__ import annotations
@@ -49,9 +49,10 @@ import psycopg2
 from psycopg2 import sql
 
 VERSION = "1.0"
-VERSION_DATE = "2026-11-01"
+VERSION_DATE = "2026-11-02"
 DEFAULT_VAC_RATIO = 2
 DEFAULT_ANALYZE_RATIO = 3
+DEFAULT_ANALYZE_MODS_RATIO = 2
 
 # Automatic load-management policy.
 LOAD_MULTIPLIER = 2.5
@@ -210,7 +211,7 @@ def parse_args() -> argparse.Namespace:
     # Operational controls.    
     parser.add_argument("--vacuum-ratio", type=int, default=DEFAULT_VAC_RATIO, help="dead-tuple percentage that triggers VACUUM (default: 2)",)
     parser.add_argument("--analyze-ratio", type=int, default=DEFAULT_ANALYZE_RATIO, help="dead-tuple percentage that triggers ANALYZE (default: 3)",)    
-    parser.add_argument("--analyze-mods-ratio", type=int, default=1, help="percentage of live tuples modified that triggers ANALYZE (default: 1)",)    
+    parser.add_argument("--analyze-mods-ratio", type=int, default=DEFAULT_ANALYZE_MODS_RATIO, help="percentage of live tuples modified that triggers ANALYZE (default: 2)",)    
     parser.add_argument("--max-table-size-gb", type=int, default=100, help="maximum table size in GB eligible for maintenance (default: 100)",)
     parser.add_argument("--max-tables", type=int, default=None, help="maximum number of tables to maintain per run (default: unlimited)",)
     parser.add_argument("-k", "--disablepageskipping", action="store_true", help="disable visibility-map page skipping during VACUUM (default: off)",)
@@ -372,22 +373,8 @@ def table_candidates(
         analyze_due = (last_ana is None or analyze_by_age or analyze_by_ratio or analyze_by_mods)        
         
         if vacuum_due or analyze_due or freeze_due:
-            candidates.append(
-                TableCandidate(
-                    schema=schema,
-                    table=table,
-                    total_bytes=int(total_bytes),
-                    estimated_rows=int(estimated_rows),
-                    live_tuples=int(live_tuples),
-                    dead_tuples=int(dead_tuples),
-                    modifications_since_analyze=int(modifications),
-                    last_vacuum=last_vacuum,
-                    last_autovacuum=last_autovacuum,
-                    last_analyze=last_analyze,
-                    last_autoanalyze=last_autoanalyze,
-                    xid_age=int(xid_age),
-                )
-            )
+            candidates.append(TableCandidate(schema=schema, table=table, total_bytes=int(total_bytes), estimated_rows=int(estimated_rows), live_tuples=int(live_tuples), dead_tuples=int(dead_tuples),
+                              modifications_since_analyze=int(modifications), last_vacuum=last_vacuum, last_autovacuum=last_autovacuum, last_analyze=last_analyze, last_autoanalyze=last_autoanalyze, xid_age=int(xid_age),))
 
     candidates.sort(key=lambda t: earliest_timestamp(t.last_vacuum, t.last_autovacuum,) or datetime.min.replace(tzinfo=timezone.utc))
 
@@ -455,11 +442,7 @@ def determine_actions(
 
     analyze_by_age = is_older_than(last_ana, 7, now)
     analyze_by_ratio = dead_ratio >= args.analyze_ratio
-    analyze_mods_ratio = (
-        table.modifications_since_analyze / table.live_tuples * 100
-        if table.live_tuples > 0
-        else (100 if table.modifications_since_analyze > 0 else 0)
-    )
+    analyze_mods_ratio = (table.modifications_since_analyze / table.live_tuples * 100 if table.live_tuples > 0 else (100 if table.modifications_since_analyze > 0 else 0))
     
     analyze_by_mods = analyze_mods_ratio >= args.analyze_mods_ratio
     freeze_due = table.xid_age >= args.vacuum_freeze_min_age
