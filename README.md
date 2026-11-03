@@ -1,4 +1,6 @@
-<img width="404" height="398" alt="image" src="https://github.com/user-attachments/assets/6f1da379-a066-4980-b227-5f1ab0a42124" />
+<p align="center">
+  <img width="300" alt="pg_smartvac mascot" src="https://github.com/user-attachments/assets/6f1da379-a066-4980-b227-5f1ab0a42124" />
+</p>
 
 # pg_smartvac
 
