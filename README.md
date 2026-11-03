@@ -13,7 +13,7 @@ Unlike traditional maintenance scripts that rely primarily on fixed schedules, `
 
 ## History
 
-The first version of this program was created in October 2026, based on the original `pg_vacuum.py` utility, which is not being updated anymore.
+The first version of this program was created in October 2026, based on my original `pg_vacuum.py` utility, which is not being updated anymore.
 
 ## Overview
 
