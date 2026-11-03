@@ -63,7 +63,7 @@ autovacuum_vacuum_threshold
 
 In PostgreSQL 18 and later, `autovacuum_vacuum_max_threshold` places an upper limit on that calculated threshold. A value of `-1` disables the cap.
 
-For ANALYZE, the trigger threshold is:
+For ANALYZE, PostgreSQL calculates the trigger threshold using the effective settings for the table:
 
 ```text
 autovacuum_analyze_threshold
