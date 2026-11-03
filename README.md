@@ -114,6 +114,18 @@ In addition to its ratio checks, `pg_smartvac` uses `--max-days` as a time-based
 **This ratio-based approach allows pg_smartvac to trigger maintenance significantly earlier than PostgreSQL's default autovacuum thresholds, particularly for large tables, helping prevent dead-tuple accumulation and table bloat before they become substantial.**
 <br/>
 <br/>
+
+## Automatic FREEZE Policy
+
+In addition to its normal VACUUM and ANALYZE decisions, `pg_smartvac` independently monitors the transaction ID age of each table to identify tables approaching PostgreSQL's anti-wraparound vacuum threshold.
+
+By default, a table becomes eligible for FREEZE when its transaction ID age reaches 80% of the current PostgreSQL `vacuum_freeze_table_age` setting. This percentage can be adjusted using `--vacuum-freeze-table-age-pct`.
+
+When triggered, `pg_smartvac` executes:
+
+```sql
+VACUUM (FREEZE, ANALYZE) schema.table;
+
 ## Cron Setup Example
 This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives GoApron runs at:
 - 6:15 AM
@@ -123,6 +135,8 @@ This example runs this tool 4 times per day at the :15 and :45 minute marks. Tha
   
 15 6,18 * * * /usr/bin/python3 /path/to/pg_smartvac.py [arguments] >> /var/log/pg_smartvac_cron.log 2>&1<br/>
 45 12,22 * * * /usr/bin/python3 /path/to/pg_smartvac.py [arguments] >> /var/log/pg_smartvac_cron.log 2>&1
+<br/>
+<br/>
 
 ## Invocation
 
