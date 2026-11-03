@@ -42,6 +42,73 @@ Here are the parameters:
 | `-v --verbose` | Enable detailed logging |
 | `--version` | Display program version |
 
+## Maintenance Thresholds: PostgreSQL GUCs vs. pg_smartvac Ratios
+
+PostgreSQL's built-in autovacuum uses tuple-count thresholds to decide when a table becomes eligible for VACUUM or ANALYZE. These decisions are controlled by configuration parameters (GUCs), including:
+
+- `autovacuum_vacuum_threshold`
+- `autovacuum_vacuum_scale_factor`
+- `autovacuum_vacuum_max_threshold` (PostgreSQL 18 and later)
+- `autovacuum_analyze_threshold`
+- `autovacuum_analyze_scale_factor`
+
+For VACUUM, PostgreSQL calculates the ordinary trigger threshold as:
+
+```text
+autovacuum_vacuum_threshold
+    + (autovacuum_vacuum_scale_factor * reltuples)
+```
+
+In PostgreSQL 18 and later, `autovacuum_vacuum_max_threshold` places an upper limit on that calculated threshold. A value of `-1` disables the cap.
+
+For ANALYZE, the trigger threshold is:
+
+```text
+autovacuum_analyze_threshold
+    + (autovacuum_analyze_scale_factor * reltuples)
+```
+
+Autovacuum compares these calculated thresholds with the table's accumulated dead tuples (for VACUUM) or modifications since the last ANALYZE (for ANALYZE). The scale factors make the thresholds grow with table size. Consequently, a large table can accumulate a substantial number of changed or dead tuples before reaching its autovacuum threshold.
+
+### Why pg_smartvac Uses Ratios
+
+`pg_smartvac` takes a different approach. Instead of reproducing PostgreSQL's tuple-count threshold calculations, it evaluates the current condition of each table using percentage-based ratios.
+
+The dead-tuple ratio used for VACUUM and ANALYZE is:
+
+```text
+dead_tuples / (live_tuples + dead_tuples) * 100
+```
+
+The modifications ratio used for ANALYZE is:
+
+```text
+modifications_since_analyze / live_tuples * 100
+```
+
+The default thresholds are:
+
+| Parameter | Default | Purpose |
+|---|---:|---|
+| `--vacuum-ratio` | 2% | Trigger VACUUM when the dead-tuple ratio reaches this percentage |
+| `--analyze-ratio` | 3% | Trigger ANALYZE when the dead-tuple ratio reaches this percentage |
+| `--analyze-mods-ratio` | 2% | Trigger ANALYZE when modifications since the last ANALYZE reach this percentage of live tuples |
+
+For example, consider a table with 10 million live tuples and 500,000 dead tuples. Its dead-tuple ratio is approximately 4.76%. That exceeds both the default 2% VACUUM threshold and the default 3% ANALYZE threshold.
+
+This percentage-based approach has several advantages:
+
+- **Consistent relative thresholds:** A 2% dead-tuple ratio represents the same relative table condition whether the table contains 100,000 rows or 100 million rows.
+- **More predictable behavior on large tables:** A global scale factor can allow a very large table to accumulate a substantial absolute number of dead tuples before autovacuum reaches its trigger threshold. A ratio gives `pg_smartvac` a direct percentage target.
+- **Independent tuning:** VACUUM and ANALYZE have separate ratio settings, allowing VACUUM to be triggered more aggressively than ANALYZE.
+- **No need to change autovacuum settings:** `pg_smartvac` applies its own maintenance policy without changing PostgreSQL's GUCs or requiring per-table autovacuum storage parameter overrides.
+
+These mechanisms are complementary, not interchangeable. `pg_smartvac` does not change or disable autovacuum. PostgreSQL's autovacuum continues to operate using its own settings, while `pg_smartvac` provides an additional, independently controlled maintenance mechanism.
+
+In addition to its ratio checks, `pg_smartvac` uses `--max-days` as a time-based safety net. A table can qualify for maintenance because its dead-tuple ratio, modifications ratio, or elapsed time since the previous maintenance operation has reached the configured threshold.
+
+**The goal is proactive, predictable maintenance based on each table's observed condition, rather than relying exclusively on PostgreSQL's built-in tuple-count thresholds.**
+
 ## Cron Setup Example
 This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives GoApron runs at:
 - 6:15 AM
