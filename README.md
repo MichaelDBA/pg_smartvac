@@ -8,7 +8,7 @@ Unlike traditional maintenance scripts that rely primarily on fixed schedules, `
 
 (c) 2026 SQLEXEC LLC
 
-<br clear="right" />
+<div style="clear: right;"></div>
 
 
 ## History
