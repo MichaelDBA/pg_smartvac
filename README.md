@@ -1,19 +1,14 @@
-<table>
-  <tr>
-    <td valign="top" width="75%">
-      <h1>pg_smartvac</h1>
+<img align="right" width="220" alt="pg_smartvac mascot" src="https://github.com/user-attachments/assets/6f1da379-a066-4980-b227-5f1ab0a42124" />
 
-      <p>This Python (v3.9) program intelligently manages PostgreSQL VACUUM, ANALYZE, and FREEZE operations based on table statistics, maintenance history, transaction ID age, and database workload.</p>
+# pg_smartvac
 
-      <p>Unlike traditional maintenance scripts that rely primarily on fixed schedules, <code>pg_smartvac</code> dynamically determines which tables need maintenance and defers execution when database activity is too high.</p>
+This Python (v3.9) program intelligently manages PostgreSQL VACUUM, ANALYZE, and FREEZE operations based on table statistics, maintenance history, transaction ID age, and database workload.
 
-      <p>(c) 2026 SQLEXEC LLC</p>
-    </td>
-    <td align="center" valign="middle" width="25%">
-      <img width="220" alt="pg_smartvac mascot" src="https://github.com/user-attachments/assets/6f1da379-a066-4980-b227-5f1ab0a42124" />
-    </td>
-  </tr>
-</table>
+Unlike traditional maintenance scripts that rely primarily on fixed schedules, `pg_smartvac` dynamically determines which tables need maintenance and defers execution when database activity is too high.
+
+(c) 2026 SQLEXEC LLC
+
+<br clear="right" />
 
 
 ## History
