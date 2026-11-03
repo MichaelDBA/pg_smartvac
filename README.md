@@ -1,4 +1,5 @@
 <img align="right" width="220" alt="pg_smartvac mascot" src="images/pg_smartvac_mascot_clean.png" />
+
 # pg_smartvac
 
 This Python (v3.9) program intelligently manages PostgreSQL VACUUM, ANALYZE, and FREEZE operations based on table statistics, maintenance history, transaction ID age, and database workload.
