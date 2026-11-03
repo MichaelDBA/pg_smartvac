@@ -107,6 +107,8 @@ This percentage-based approach has several advantages:
 
 These mechanisms are complementary, not interchangeable. `pg_smartvac` does not change or disable autovacuum. PostgreSQL's autovacuum continues to operate using its own settings, while `pg_smartvac` provides an additional, independently controlled maintenance mechanism.
 
+The FREEZE policy operates independently of these ratio-based thresholds. It monitors each table's transaction ID age and triggers FREEZE when that age reaches the configured percentage of PostgreSQL's `vacuum_freeze_table_age`. See the Automatic FREEZE Policy section below for details.
+
 In addition to its ratio checks, `pg_smartvac` uses `--max-days` as a time-based safety net. A table can qualify for maintenance because its dead-tuple ratio, modifications ratio, or elapsed time since the previous maintenance operation has reached the configured threshold.
 
 **The goal is proactive, predictable maintenance based on each table's observed condition, rather than relying exclusively on PostgreSQL's built-in tuple-count thresholds.**
