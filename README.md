@@ -54,12 +54,14 @@ PostgreSQL's built-in autovacuum uses tuple-count thresholds to decide when a ta
 - `autovacuum_analyze_threshold`
 - `autovacuum_analyze_scale_factor`
 
-For VACUUM, PostgreSQL calculates the ordinary trigger threshold as:
+For VACUUM, PostgreSQL calculates the trigger threshold using the effective settings for the table:
 
 ```text
 autovacuum_vacuum_threshold
     + (autovacuum_vacuum_scale_factor * reltuples)
 ```
+
+the threshold and scale factor.
 
 In PostgreSQL 18 and later, `autovacuum_vacuum_max_threshold` places an upper limit on that calculated threshold. A value of `-1` disables the cap.
 
@@ -69,6 +71,8 @@ For ANALYZE, PostgreSQL calculates the trigger threshold using the effective set
 autovacuum_analyze_threshold
     + (autovacuum_analyze_scale_factor * reltuples)
 ```
+
+The effective settings are taken from the table's storage parameters when explicitly configured; otherwise, PostgreSQL uses the corresponding global GUC values. This applies to both the threshold and scale factor.
 
 Autovacuum compares these calculated thresholds with the table's accumulated dead tuples (for VACUUM) or modifications since the last ANALYZE (for ANALYZE). The scale factors make the thresholds grow with table size. Consequently, a large table can accumulate a substantial number of changed or dead tuples before reaching its autovacuum threshold.
 
