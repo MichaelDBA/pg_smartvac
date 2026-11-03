@@ -148,7 +148,7 @@ This policy provides an additional safeguard against transaction ID wraparound b
 <br/>
 
 ## Cron Setup Example
-This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives GoApron runs at:
+This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives runs at:
 - 6:15 AM
 - 12:45 PM
 - 6:15 PM
