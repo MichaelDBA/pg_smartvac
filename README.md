@@ -38,6 +38,7 @@ Here are the parameters:
 | `--max-tables` | Maximum number of tables to maintain per run (default: unlimited) |
 | `--max-days` | Maximum number of days before automatic VACUUM/ANALYZE is triggered per run (default: 7) |
 | `--vacuum-freeze-table-age-pct` | Percentage of `vacuum_freeze_table_age` at which a table FREEZE is triggered (default: 80) |
+| `--max-freeze-tables` | Maximum number of tables to FREEZE per run (default: 20) |
 | `-k --disablepageskipping` | Disable visibility-map page skipping during VACUUM |
 | `--dryrun` | Display planned maintenance SQL without executing it |
 | `-v --verbose` | Enable detailed logging |
