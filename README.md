@@ -10,6 +10,8 @@ Unlike traditional maintenance scripts that rely primarily on fixed schedules, `
 
 <div style="clear: right;"></div>
 
+## Requirements
+Requires psycopg2 for PG database access.
 
 ## History
 
