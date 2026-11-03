@@ -33,9 +33,10 @@ Here are the parameters:
 | `-m --schema` | Restrict maintenance to a specific schema (default: all user schemas) |
 | `--vacuum-ratio` | Dead-tuple percentage that triggers VACUUM (default: 2) |
 | `--analyze-ratio` | Dead-tuple percentage that triggers ANALYZE (default: 3) |
-| `--analyze-mods-ratio` | Percentage of live tuples modified that triggers ANALYZE (default: 1) |
+| `--analyze-mods-ratio` | Percentage of live tuples modified that triggers ANALYZE (default: 2) |
 | `--max-table-size-gb` | Maximum table size in GB eligible for maintenance (default: 100) |
 | `--max-tables` | Maximum number of tables to maintain per run (default: unlimited) |
+| `--max-days` | Maximum number of days before automatic VACUUM/ANALYZE is triggered per run (default: 7) |
 | `-k --disablepageskipping` | Disable visibility-map page skipping during VACUUM |
 | `--dryrun` | Display planned maintenance SQL without executing it |
 | `-v --verbose` | Enable detailed logging |
@@ -55,6 +56,7 @@ This example runs this tool 4 times per day at the :15 and :45 minute marks. Tha
 
 General syntax:
 
+Minimum options using defaults:
 `python pg_smartvac.py -H <dbhost>  -d <dbname> -U <dbuser> -p <dbport> --vcpus <digit> [other options]`
 
 The default settings are normally fine.  Also, don't forget to set the PGPASSWORD environment variable before executing this utility.
