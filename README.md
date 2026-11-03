@@ -35,7 +35,7 @@ Here are the parameters:
 | `--analyze-ratio` | Dead-tuple percentage that triggers ANALYZE (default: 3) |
 | `--analyze-mods-ratio` | Percentage of live tuples modified that triggers ANALYZE (default: 2) |
 | `--max-table-size-gb` | Maximum table size in GB eligible for maintenance (default: 100) |
-| `--max-tables` | Maximum number of tables to maintain per run (default: unlimited) |
+| `--max-tables` | Maximum number of tables to maintain per run (default: unlimited; excludes FREEZE) |
 | `--max-days` | Maximum number of days before automatic VACUUM/ANALYZE is triggered per run (default: 7) |
 | `--vacuum-freeze-table-age-pct` | Percentage of `vacuum_freeze_table_age` at which a table FREEZE is triggered (default: 80) |
 | `--max-freeze-tables` | Maximum number of tables to FREEZE per run (default: 20) |
