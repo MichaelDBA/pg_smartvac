@@ -69,6 +69,11 @@ Connect to a PostgreSQL database and display the proposed maintenance operations
 
 `python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 --dryrun`
 
+Same as before but show rationale for why tables qualified:
+
+`python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 --dryrun -v`
+
+
 **Restrict maintenance to a schema**
 
 Only consider tables in the specified schema.
