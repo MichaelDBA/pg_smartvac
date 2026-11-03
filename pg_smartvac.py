@@ -16,13 +16,13 @@
 #   1. Change top shebang line to account for python, python or python2  
 #   2. By default, system schemas are not included when schemaname is ommitted from command line.
 #
-# call example with all parameters:
-# python pg_smartvac .py -H localhost -d mydb -U myuser -p 5432 -m public --vcpus 8 --analyze-ratio 1 --analyze-mods-ratio 1 --max-tables 1 --max-table-size-gb 200 --dryrun -v
+# call example using default parameters in verbose, dryrun mode:
+# python pg_smartvac .py -H localhost -d mydb -U myuser -p 5432 -m public --vcpus 8 --dryrun -v
 #
 # Date Modified:
 # 2026-10-26 Original coding based on pg_vacuum.py
 # 2026-11-02 Added more functionality to incorporate other pg_vacuum.py features.
-#
+# 2026-11-03 Added more parameters to control MINs and MAXs and better FREEZE logic.
 #
 ##################################################################################################
 from __future__ import annotations
@@ -48,11 +48,17 @@ else:
 import psycopg2
 from psycopg2 import sql
 
-VERSION = "1.0"
-VERSION_DATE = "2026-11-02"
+VERSION = "1.1"
+VERSION_DATE = "2026-11-03"
+
+# Defaults if parameters are not specified
 DEFAULT_VAC_RATIO = 2
 DEFAULT_ANALYZE_RATIO = 3
 DEFAULT_ANALYZE_MODS_RATIO = 2
+DEFAULT_MAX_DAYS = 7
+DEFAULT_MAX_TBL_SIZE_GB = 100
+DEFAULT_FREEZE_TBL_AGE_PCT = 80
+DEFAULT_FREEZE_MAX_TABLES = 20
 
 # Automatic load-management policy.
 LOAD_MULTIPLIER = 2.5
@@ -209,11 +215,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-m", "--schema", default="", help="only process this schema (default: all user schemas)",)
 
     # Operational controls.    
-    parser.add_argument("--vacuum-ratio", type=int, default=DEFAULT_VAC_RATIO, help="dead-tuple percentage that triggers VACUUM (default: 2)",)
-    parser.add_argument("--analyze-ratio", type=int, default=DEFAULT_ANALYZE_RATIO, help="dead-tuple percentage that triggers ANALYZE (default: 3)",)    
-    parser.add_argument("--analyze-mods-ratio", type=int, default=DEFAULT_ANALYZE_MODS_RATIO, help="percentage of live tuples modified that triggers ANALYZE (default: 2)",)    
-    parser.add_argument("--max-table-size-gb", type=int, default=100, help="maximum table size in GB eligible for maintenance (default: 100)",)
-    parser.add_argument("--max-tables", type=int, default=None, help="maximum number of tables to maintain per run (default: unlimited)",)
+    parser.add_argument("--vacuum-ratio", type=int, default=DEFAULT_VAC_RATIO, help=f"dead-tuple percentage that triggers VACUUM (default: {DEFAULT_VAC_RATIO})",)
+    parser.add_argument("--analyze-ratio", type=int, default=DEFAULT_ANALYZE_RATIO, help=f"dead-tuple percentage that triggers ANALYZE (default: {DEFAULT_ANALYZE_RATIO})",)
+    parser.add_argument("--analyze-mods-ratio", type=int, default=DEFAULT_ANALYZE_MODS_RATIO, help=f"percentage of live tuples modified that triggers ANALYZE (default: {DEFAULT_ANALYZE_MODS_RATIO})",)
+    parser.add_argument("--max-table-size-gb", type=int, default=DEFAULT_MAX_TBL_SIZE_GB, help=f"maximum table size in GB eligible for maintenance (default: {DEFAULT_MAX_TBL_SIZE_GB})",)    
+    parser.add_argument("--max-tables", type=int, default=None, help="maximum number of ordinary VACUUM/ANALYZE tables per run (default: unlimited; excludes FREEZE)",)
+    parser.add_argument("--max-days", type=int, default=DEFAULT_MAX_DAYS, help=f"elapsed days before VACUUM or ANALYZE is triggered (default: {DEFAULT_MAX_DAYS})",)
+    parser.add_argument("--vacuum-freeze-table-age-pct", type=int, default=DEFAULT_FREEZE_TBL_AGE_PCT, help=f"percentage of vacuum_freeze_table_age that triggers FREEZE (default: {DEFAULT_FREEZE_TBL_AGE_PCT})",)
+    parser.add_argument("--max-freeze-tables", type=int, default=DEFAULT_FREEZE_MAX_TABLES, help=f"maximum number of tables to FREEZE per run (default: {DEFAULT_FREEZE_MAX_TABLES})",)    
     parser.add_argument("-k", "--disablepageskipping", action="store_true", help="disable visibility-map page skipping during VACUUM (default: off)",)
 
     parser.add_argument("--dryrun", action="store_true", help="show actions without executing them",)
@@ -328,12 +337,12 @@ def table_candidates(
 
 
     with connection.cursor() as cursor:
-        cursor.execute("SHOW vacuum_freeze_min_age")
-        args.vacuum_freeze_min_age = int(cursor.fetchone()[0])
-        
+        cursor.execute("SHOW vacuum_freeze_table_age")
+        args.vacuum_freeze_table_age = int(cursor.fetchone()[0])
+        args.freeze_threshold = int(args.vacuum_freeze_table_age * args.vacuum_freeze_table_age_pct / 100)
         cursor.execute(query)
         rows = cursor.fetchall()
-
+        
     now = datetime.now(timezone.utc)
     candidates: list[TableCandidate] = []
 
@@ -359,15 +368,15 @@ def table_candidates(
 
         dead_ratio = (dead_tuples / (live_tuples + dead_tuples) * 100 if (live_tuples + dead_tuples) > 0 else 0)
 
-        vacuum_by_age = is_older_than(last_vac, 7, now)
+        vacuum_by_age = is_older_than(last_vac, args.max_days, now)
         vacuum_by_ratio = dead_ratio >= args.vacuum_ratio
+        analyze_by_age = is_older_than(last_ana, args.max_days, now)
 
-        analyze_by_age = is_older_than(last_ana, 7, now)
         analyze_by_ratio = dead_ratio >= args.analyze_ratio
         analyze_mods_ratio = (modifications / live_tuples * 100 if live_tuples > 0 else (100 if modifications > 0 else 0))
         analyze_by_mods = analyze_mods_ratio >= args.analyze_mods_ratio        
 
-        freeze_due = xid_age >= args.vacuum_freeze_min_age
+        freeze_due = xid_age >= args.freeze_threshold
 
         vacuum_due = last_vac is None or vacuum_by_age or vacuum_by_ratio
         analyze_due = (last_ana is None or analyze_by_age or analyze_by_ratio or analyze_by_mods)        
@@ -376,7 +385,13 @@ def table_candidates(
             candidates.append(TableCandidate(schema=schema, table=table, total_bytes=int(total_bytes), estimated_rows=int(estimated_rows), live_tuples=int(live_tuples), dead_tuples=int(dead_tuples),
                               modifications_since_analyze=int(modifications), last_vacuum=last_vacuum, last_autovacuum=last_autovacuum, last_analyze=last_analyze, last_autoanalyze=last_autoanalyze, xid_age=int(xid_age),))
 
-    candidates.sort(key=lambda t: earliest_timestamp(t.last_vacuum, t.last_autovacuum,) or datetime.min.replace(tzinfo=timezone.utc))
+    # Process FREEZE candidates first, prioritizing the oldest XID age.
+    # Preserve the existing oldest-VACUUM-first ordering for other candidates.
+    candidates.sort(
+                    key=lambda t: (0 if t.xid_age >= args.freeze_threshold else 1,
+                    -t.xid_age if t.xid_age >= args.freeze_threshold else 0,
+                    earliest_timestamp(t.last_vacuum, t.last_autovacuum,) or datetime.min.replace(tzinfo=timezone.utc),)
+                   )    
 
     return candidates[:9999]
 
@@ -437,15 +452,15 @@ def determine_actions(
 
     dead_ratio = (table.dead_tuples / (table.live_tuples + table.dead_tuples) * 100 if (table.live_tuples + table.dead_tuples) > 0 else 0)
 
-    vacuum_by_age = is_older_than(last_vac, 7, now)
+    vacuum_by_age = is_older_than(last_vac, args.max_days, now)
     vacuum_by_ratio = dead_ratio >= args.vacuum_ratio
+    analyze_by_age = is_older_than(last_ana, args.max_days, now)
 
-    analyze_by_age = is_older_than(last_ana, 7, now)
     analyze_by_ratio = dead_ratio >= args.analyze_ratio
     analyze_mods_ratio = (table.modifications_since_analyze / table.live_tuples * 100 if table.live_tuples > 0 else (100 if table.modifications_since_analyze > 0 else 0))
     
     analyze_by_mods = analyze_mods_ratio >= args.analyze_mods_ratio
-    freeze_due = table.xid_age >= args.vacuum_freeze_min_age
+    freeze_due = table.xid_age >= args.freeze_threshold
 
     vacuum_due = last_vac is None or vacuum_by_age or vacuum_by_ratio
     analyze_due = (last_ana is None or analyze_by_age or analyze_by_ratio or analyze_by_mods)
@@ -456,7 +471,7 @@ def determine_actions(
     if last_vac is None:
         vacuum_reasons.append("no previous VACUUM recorded")
     elif vacuum_by_age:
-        vacuum_reasons.append("last VACUUM was at least 7 days ago")
+        vacuum_reasons.append(f"last VACUUM was at least {args.max_days} days ago")        
 
     if vacuum_by_ratio:
         vacuum_reasons.append(f"dead-tuple ratio {dead_ratio:.2f}% >= VACUUM threshold {args.vacuum_ratio}%")
@@ -464,7 +479,7 @@ def determine_actions(
     if last_ana is None:
         analyze_reasons.append("no previous ANALYZE recorded")
     elif analyze_by_age:
-        analyze_reasons.append("last ANALYZE was at least 7 days ago")
+        analyze_reasons.append(f"last ANALYZE was at least {args.max_days} days ago")        
 
     if analyze_by_ratio:
         analyze_reasons.append(f"dead-tuple ratio {dead_ratio:.2f}% >= ANALYZE threshold {args.analyze_ratio}%")
@@ -473,7 +488,7 @@ def determine_actions(
         analyze_reasons.append(f"modifications ratio {analyze_mods_ratio:.2f}% >= ANALYZE modifications threshold {args.analyze_mods_ratio}%")
 
     if freeze_due:
-        return ["FREEZE"], ["freeze policy triggered"]
+        return ["FREEZE"], [f"table XID age {table.xid_age:,} >= FREEZE threshold {args.freeze_threshold:,} ({args.vacuum_freeze_table_age_pct}% of vacuum_freeze_table_age {args.vacuum_freeze_table_age:,})"]
 
     if vacuum_due and analyze_due:
         return ["VACUUM ANALYZE"], vacuum_reasons + analyze_reasons
@@ -552,7 +567,7 @@ def main() -> int:
         return 2
 
     if not 0 <= args.vacuum_ratio <= 100:
-        logging.error("--vac-ratio must be an integer from 0 to 100.")
+        logging.error("--vacuum-ratio must be an integer from 0 to 100.")
         return 2
 
     if not 0 <= args.analyze_ratio <= 100:
@@ -563,12 +578,24 @@ def main() -> int:
         logging.error("--analyze-mods-ratio must be an integer from 0 to 100.")
         return 2
 
+    if not 1 <= args.vacuum_freeze_table_age_pct <= 100:
+        logging.error("--vacuum-freeze-table-age-pct must be an integer from 1 to 100.")
+        return 2
+
     if args.max_table_size_gb <= 0:
         logging.error("--max-table-size-gb must be greater than zero.")
         return 2
 
     if args.max_tables is not None and args.max_tables <= 0:
         logging.error("--max-tables must be greater than zero.")
+        return 2
+
+    if args.max_freeze_tables <= 0:
+        logging.error("--max-freeze-tables must be greater than zero.")
+        return 2
+
+    if args.max_days <= 0:
+        logging.error("--max-days must be greater than zero.")
         return 2
 
     if not acquire_instance_lock():
@@ -619,7 +646,9 @@ def main() -> int:
         log_info("TABLES", "%s eligible for evaluation.", len(candidates))
         active_vacuums = get_active_vacuum_tables(connection)
         processed_tables = 0
+        freeze_tables = 0
         deferred_tables = 0
+        deferred_freeze_tables = 0        
 
         for table in candidates:
             if (table.schema, table.table) in active_vacuums:
@@ -635,12 +664,21 @@ def main() -> int:
                 summary["skipped"] += 1
                 continue
 
-            if args.max_tables is not None and processed_tables >= args.max_tables:
-                deferred_tables += 1
-                summary["skipped"] += 1
-                continue
+            is_freeze = actions == ["FREEZE"]
 
-            processed_tables += 1
+            if is_freeze:
+                if freeze_tables >= args.max_freeze_tables:
+                    deferred_freeze_tables += 1
+                    summary["skipped"] += 1
+                    continue
+                # Count each selected FREEZE table as an attempt, including failures.
+                freeze_tables += 1
+            else:
+                if args.max_tables is not None and processed_tables >= args.max_tables:
+                    deferred_tables += 1
+                    summary["skipped"] += 1
+                    continue
+                processed_tables += 1            
 
             dead_ratio = (table.dead_tuples / (table.live_tuples + table.dead_tuples) * 100 if (table.live_tuples + table.dead_tuples) > 0 else 0)
 
@@ -697,6 +735,12 @@ def main() -> int:
 
         if deferred_tables:
             message = f"Deferred {deferred_tables} table(s): --max-tables limit of {args.max_tables} reached."
+            logging.info(message)
+            if not args.verbose:
+                print(f"{datetime.now().astimezone():%Y-%m-%d %H:%M:%S} INFO: {message}", flush=True)
+
+        if deferred_freeze_tables:
+            message = f"Deferred {deferred_freeze_tables} table(s): --max-freeze-tables limit of {args.max_freeze_tables} reached."
             logging.info(message)
             if not args.verbose:
                 print(f"{datetime.now().astimezone():%Y-%m-%d %H:%M:%S} INFO: {message}", flush=True)
