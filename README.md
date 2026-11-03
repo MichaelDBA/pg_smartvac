@@ -56,7 +56,7 @@ This example runs this tool 4 times per day at the :15 and :45 minute marks. Tha
 
 General syntax:
 
-Minimum options using defaults:
+Minimum options using defaults:<br/>
 `python pg_smartvac.py -H <dbhost>  -d <dbname> -U <dbuser> -p <dbport> --vcpus <digit> [other options]`
 
 The default settings are normally fine.  Also, don't forget to set the PGPASSWORD environment variable before executing this utility.
