@@ -63,7 +63,7 @@ The default settings are normally fine.  Also, don't forget to set the PGPASSWOR
 
 The following examples illustrate common ways to invoke the program.
 
-
+<br/><br/>
 **Basic dry run**
 
 Connect to a PostgreSQL database and display the proposed maintenance operations without executing them.
@@ -74,34 +74,35 @@ Same as before but show rationale for why tables qualified:
 
 `python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 --dryrun -v`
 
-
+<br/><br/>
 **Restrict maintenance to a schema**
 
 Only consider tables in the specified schema.
 
 `python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 -m public --vcpus 4`
 
-
+<br/><br/>
 **Use custom maintenance thresholds**
 
 Trigger VACUUM when dead tuples reach 1%, ANALYZE when dead tuples reach 1%, and ANALYZE when modifications reach 1% of live tuples.
 
 `python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 --vacuum-ratio 1 --analyze-ratio 1 --analyze-mods-ratio 1`
 
-
+<br/><br/>
 **Limit the number of tables**
 
 Process a maximum of 20 tables in a single run.
 
 `python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 --max-tables 20`
 
-
+<br/><br/>
 **Disable visibility-map page skipping**
 
 Force VACUUM to scan pages that would normally be skipped based on the visibility map.
 
 `python pg_smartvac.py -H localhost -d testing -U postgres -p 5432 --vcpus 4 -k`
 
+<br/><br/>
 
 
 ## Sample Console and log file screenshots
