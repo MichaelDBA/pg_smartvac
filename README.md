@@ -125,6 +125,17 @@ When triggered, `pg_smartvac` executes:
 
 ```sql
 VACUUM (FREEZE, ANALYZE) schema.table;
+```
+
+FREEZE operations take priority over ordinary VACUUM and ANALYZE operations. Tables with the highest transaction ID age are processed first.
+
+FREEZE operations have their own independent per-run limit, controlled by `--max-freeze-tables` (default: 20). This limit is separate from `--max-tables`, which applies only to ordinary VACUUM and ANALYZE operations.
+
+The existing `--max-table-size-gb` setting applies to FREEZE as well, excluding tables larger than the configured limit from maintenance.
+
+This policy provides an additional safeguard against transaction ID wraparound by proactively freezing tables before PostgreSQL reaches its more aggressive anti-wraparound maintenance threshold.
+<br/>
+<br/>
 
 ## Cron Setup Example
 This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives GoApron runs at:
