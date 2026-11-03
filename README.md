@@ -109,6 +109,8 @@ In addition to its ratio checks, `pg_smartvac` uses `--max-days` as a time-based
 
 **The goal is proactive, predictable maintenance based on each table's observed condition, rather than relying exclusively on PostgreSQL's built-in tuple-count thresholds.**
 
+**This ratio-based approach allows pg_smartvac to trigger maintenance significantly earlier than PostgreSQL's default autovacuum thresholds, particularly for large tables, helping prevent dead-tuple accumulation and table bloat before they become substantial.**
+
 ## Cron Setup Example
 This example runs this tool 4 times per day at the :15 and :45 minute marks. That gives GoApron runs at:
 - 6:15 AM
