@@ -50,6 +50,19 @@ Here are the parameters:
 | `-v --verbose` | Enable detailed logging |
 | `--version` | Display program version |
 
+## Why pg_smartvac?
+
+PostgreSQL autovacuum is essential for maintaining database health, but DBAs may want additional control over when and how maintenance is performed. `pg_smartvac` complements PostgreSQL's native maintenance capabilities by providing an independent, workload-aware maintenance strategy. Key benefits include:
+
+- **Workload-aware scheduling:** Monitors database activity and defers maintenance until workload conditions are acceptable.
+- **Independent maintenance policies:** Uses configurable, percentage-based thresholds and maintenance history to determine when tables need attention.
+- **Centralized control:** Manages VACUUM, ANALYZE, and FREEZE through a single utility with configurable limits and priorities.
+- **Proactive maintenance:** Identifies tables that may benefit from maintenance before PostgreSQL's normal autovacuum thresholds are reached.
+- **Operational visibility:** Logs maintenance decisions and execution details, giving DBAs insight into what was processed and why.
+
+`pg_smartvac` does not replace or disable PostgreSQL autovacuum. It provides an additional layer of control, allowing DBAs to complement native maintenance with their own scheduling policies and operational preferences.
+
+
 ## Maintenance Thresholds: PostgreSQL GUCs vs. pg_smartvac Ratios
 
 PostgreSQL's built-in autovacuum uses tuple-count thresholds to decide when a table becomes eligible for VACUUM or ANALYZE. These decisions are controlled by configuration parameters (GUCs), including:
