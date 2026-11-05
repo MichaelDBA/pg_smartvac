@@ -22,7 +22,7 @@
 # Date Modified:
 # 2026-10-26 Original coding based on pg_vacuum.py
 # 2026-11-02 Added more functionality to incorporate other pg_vacuum.py features.
-# 2026-11-03 Added more parameters to control MINs and MAXs and better FREEZE logic.
+# 2026-11-05 Added more parameters to control MINs and MAXs and better FREEZE logic.
 #
 ##################################################################################################
 from __future__ import annotations
@@ -49,7 +49,7 @@ import psycopg2
 from psycopg2 import sql
 
 VERSION = "1.1"
-VERSION_DATE = "2026-11-03"
+VERSION_DATE = "2026-11-05"
 
 # Defaults if parameters are not specified
 DEFAULT_VAC_RATIO = 2
@@ -150,8 +150,9 @@ def log_summary(summary: dict, dryrun: bool) -> None:
             f"skipped={summary['skipped']} * "
             f"failed={summary['failed']} * "
             f"planned_tables={summary['planned_tables']} * "
-            f"VACUUM={summary['planned_vacuum']} * "
-            f"ANALYZE={summary['planned_analyze']} * "
+            f"VACUUM/ANALYZE={summary['planned_vacuum_analyze']} * "
+            f"VACUUM={summary['planned_vacuum_only']} * "
+            f"ANALYZE={summary['planned_analyze_only']} * "
             f"FREEZE={summary['planned_freeze']}"
         )
     else:
@@ -160,15 +161,16 @@ def log_summary(summary: dict, dryrun: bool) -> None:
             f"maintained={summary['maintained']} * "
             f"skipped={summary['skipped']} * "
             f"failed={summary['failed']} * "
-            f"VACUUM={summary['vacuum']} * "
-            f"ANALYZE={summary['analyze']} * "
+            f"VACUUM/ANALYZE={summary['vacuum_analyze']} * "
+            f"VACUUM={summary['vacuum_only']} * "
+            f"ANALYZE={summary['analyze_only']} * "
             f"FREEZE={summary['freeze']}"
         )
 
     message = format_log_message("SUMMARY", line)
     log_event(f"INFO: {message}")
     print(f"{datetime.now().astimezone():%Y-%m-%d %H:%M:%S} INFO: {message}", flush=True)
-
+    
 
 def log_sql_action(statement: str) -> None:
     """Append one timestamped line for each maintenance SQL command."""
@@ -610,15 +612,17 @@ def main() -> int:
         "maintained": 0,
         "skipped": 0,
         "failed": 0,
-        "vacuum": 0,
-        "analyze": 0,
+        "vacuum_analyze": 0,
+        "vacuum_only": 0,
+        "analyze_only": 0,
         "freeze": 0,
         "planned_tables": 0,
-        "planned_vacuum": 0,
-        "planned_analyze": 0,
+        "planned_vacuum_analyze": 0,
+        "planned_vacuum_only": 0,
+        "planned_analyze_only": 0,
         "planned_freeze": 0,
     }
-
+    
     try:
         start_message = (
             f"version={VERSION}  date={VERSION_DATE}  database={args.dbname}  "
@@ -707,20 +711,24 @@ def main() -> int:
                     perform_action(connection, table, action, args)
 
                     if args.dryrun:
-                        if action in ("VACUUM", "VACUUM ANALYZE", "FREEZE"):
-                            summary["planned_vacuum"] += 1
-                        if action in ("ANALYZE", "VACUUM ANALYZE", "FREEZE"):
-                            summary["planned_analyze"] += 1
-                        if action == "FREEZE":
+                        if action == "VACUUM ANALYZE":
+                            summary["planned_vacuum_analyze"] += 1
+                        elif action == "VACUUM":
+                            summary["planned_vacuum_only"] += 1
+                        elif action == "ANALYZE":
+                            summary["planned_analyze_only"] += 1
+                        elif action == "FREEZE":
                             summary["planned_freeze"] += 1
                     else:
-                        if action in ("VACUUM", "VACUUM ANALYZE", "FREEZE"):
-                            summary["vacuum"] += 1
-                        if action in ("ANALYZE", "VACUUM ANALYZE", "FREEZE"):
-                            summary["analyze"] += 1
-                        if action == "FREEZE":
+                        if action == "VACUUM ANALYZE":
+                            summary["vacuum_analyze"] += 1
+                        elif action == "VACUUM":
+                            summary["vacuum_only"] += 1
+                        elif action == "ANALYZE":
+                            summary["analyze_only"] += 1
+                        elif action == "FREEZE":
                             summary["freeze"] += 1
-
+                            
                 except Exception as exc:
                     logging.error("Maintenance failed for %s.%s: %s", table.schema, table.table, exc)
                     table_failed = True
