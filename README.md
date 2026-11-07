@@ -84,8 +84,6 @@ autovacuum_vacuum_threshold
     + (autovacuum_vacuum_scale_factor * reltuples)
 ```
 
-the threshold and scale factor.
-
 In PostgreSQL 18 and later, `autovacuum_vacuum_max_threshold` places an upper limit on that calculated threshold. A value of `-1` disables the cap.
 
 For ANALYZE, PostgreSQL calculates the trigger threshold using the effective settings for the table:
@@ -99,7 +97,7 @@ The effective settings are taken from the table's storage parameters when explic
 
 Autovacuum compares these calculated thresholds with the table's accumulated dead tuples (for VACUUM) or modifications since the last ANALYZE (for ANALYZE). The scale factors make the thresholds grow with table size. Consequently, a large table can accumulate a substantial number of changed or dead tuples before reaching its autovacuum threshold.
 
-### TOAST-Aware VACUUM Decisions:
+### TOAST-Aware VACUUM Decisions
 - TOAST relations have their own live and dead tuple statistics.
 - Their VACUUM threshold is calculated using their own effective autovacuum threshold and scale-factor settings.
 - Table-specific TOAST storage parameters take precedence over server defaults.
@@ -107,7 +105,7 @@ Autovacuum compares these calculated thresholds with the table's accumulated dea
 - When TOAST dead tuples reach the calculated threshold, the parent table qualifies for VACUUM, regardless of its own dead-tuple ratio.
 - VACUUM is issued against the parent table, not the TOAST relation directly.
 
-### TOAST FSM Diagnostics:
+### TOAST FSM Diagnostics
 - FSM free-space information is collected only in verbose mode.
 - It is optional and depends on pg_freespacemap being installed and accessible.
 - If unavailable, TOAST tuple statistics still work.
@@ -116,7 +114,7 @@ Autovacuum compares these calculated thresholds with the table's accumulated dea
 
 ### Why pg_smartvac Uses Ratios
 
-`pg_smartvac` takes a different approach. instead of reproducing PostgreSQL's tuple-count threshold calculations, pg_smartvac evaluates the current condition of each table using percentage-based ratios.
+For ordinary parent-table maintenance, `pg_smartvac` takes a different approach. Instead of reproducing PostgreSQL's tuple-count threshold calculations, it evaluates the current condition of each table using percentage-based ratios.
 
 The dead-tuple ratio used for VACUUM and ANALYZE is:
 
