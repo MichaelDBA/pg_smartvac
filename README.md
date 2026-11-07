@@ -116,7 +116,7 @@ Autovacuum compares these calculated thresholds with the table's accumulated dea
 
 ### Why pg_smartvac Uses Ratios
 
-`pg_smartvac` takes a different approach. Instead of reproducing PostgreSQL's tuple-count threshold calculations, it evaluates the current condition of each table using percentage-based ratios.
+`pg_smartvac` takes a different approach. instead of reproducing PostgreSQL's tuple-count threshold calculations, pg_smartvac evaluates the current condition of each table using percentage-based ratios.
 
 The dead-tuple ratio used for VACUUM and ANALYZE is:
 
