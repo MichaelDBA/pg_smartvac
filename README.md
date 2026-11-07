@@ -62,6 +62,7 @@ PostgreSQL autovacuum is essential for maintaining database health, but DBAs may
 - **Centralized control:** Manages VACUUM, ANALYZE, and FREEZE through a single utility with configurable limits and priorities.
 - **Proactive maintenance:** Identifies tables that may benefit from maintenance before PostgreSQL's normal autovacuum thresholds are reached.
 - **Operational visibility:** Logs maintenance decisions and execution details, giving DBAs insight into what was processed and why.
+- TOAST-aware maintenance: Evaluates TOAST dead tuples independently of parent-table dead-tuple ratios, allowing VACUUM to be triggered when TOAST needs maintenance even if the parent table does not meet its normal threshold.
 
 `pg_smartvac` does not replace or disable PostgreSQL autovacuum. It provides an additional layer of control, allowing DBAs to complement native maintenance with their own scheduling policies and operational preferences.
 
@@ -97,6 +98,21 @@ autovacuum_analyze_threshold
 The effective settings are taken from the table's storage parameters when explicitly configured; otherwise, PostgreSQL uses the corresponding global GUC values. This applies to both the threshold and scale factor.
 
 Autovacuum compares these calculated thresholds with the table's accumulated dead tuples (for VACUUM) or modifications since the last ANALYZE (for ANALYZE). The scale factors make the thresholds grow with table size. Consequently, a large table can accumulate a substantial number of changed or dead tuples before reaching its autovacuum threshold.
+
+### TOAST-Aware VACUUM Decisions:
+- TOAST relations have their own live and dead tuple statistics.
+- Their VACUUM threshold is calculated using their own effective autovacuum threshold and scale-factor settings.
+- Table-specific TOAST storage parameters take precedence over server defaults.
+- The PostgreSQL 18+ maximum vacuum threshold is respected when supported.
+- When TOAST dead tuples reach the calculated threshold, the parent table qualifies for VACUUM, regardless of its own dead-tuple ratio.
+- VACUUM is issued against the parent table, not the TOAST relation directly.
+
+### TOAST FSM Diagnostics:
+- FSM free-space information is collected only in verbose mode.
+- It is optional and depends on pg_freespacemap being installed and accessible.
+- If unavailable, TOAST tuple statistics still work.
+- FSM free space is diagnostic only and never triggers VACUUM.
+
 
 ### Why pg_smartvac Uses Ratios
 
