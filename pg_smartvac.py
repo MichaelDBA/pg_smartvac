@@ -23,7 +23,7 @@
 # 2026-10-26 Original coding based on pg_vacuum.py
 # 2026-11-02 Added more functionality to incorporate other pg_vacuum.py features.
 # 2026-11-05 Added more parameters to control MINs and MAXs and better FREEZE logic.
-#
+# 2026-11-07 Added toast table analysis
 ##################################################################################################
 from __future__ import annotations
 
@@ -48,8 +48,8 @@ else:
 import psycopg2
 from psycopg2 import sql
 
-VERSION = "1.1"
-VERSION_DATE = "2026-11-05"
+VERSION = "1.2"
+VERSION_DATE = "2026-11-07"
 
 # Defaults if parameters are not specified
 DEFAULT_VAC_RATIO = 2
@@ -191,13 +191,19 @@ class TableCandidate:
     last_analyze: Optional[datetime]
     last_autoanalyze: Optional[datetime]
     xid_age: int
+    toast_oid: Optional[int]
+    toast_pages: int
+    toast_live_tuples: int
+    toast_dead_tuples: int
+    toast_vacuum_threshold: Optional[int]
+    toast_fsm_free_bytes: Optional[int] = None
 
     @property
     def qualified_name(self) -> str:
         escaped_schema = self.schema.replace('"', '""')
         escaped_table = self.table.replace('"', '""')
         return f'"{escaped_schema}"."{escaped_table}"'
-
+        
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Standalone, load-aware PostgreSQL VACUUM / ANALYZE manager.")
@@ -316,19 +322,39 @@ def table_candidates(
             pg_total_relation_size(c.oid) AS total_bytes,
             GREATEST(c.reltuples, 0)::bigint AS estimated_rows,
             COALESCE(s.n_live_tup, 0)::bigint AS live_tuples,
-            COALESCE(s.n_dead_tup, 0)::bigint AS dead_tuples,            
-            COALESCE(s.n_mod_since_analyze, 0)::bigint
-                AS modifications_since_analyze,
+            COALESCE(s.n_dead_tup, 0)::bigint AS dead_tuples,
+            COALESCE(s.n_mod_since_analyze, 0)::bigint AS modifications_since_analyze,
             s.last_vacuum,
             s.last_autovacuum,
             s.last_analyze,
             s.last_autoanalyze,
             age(c.relfrozenxid)::bigint AS xid_age,
+            tc.oid AS toast_oid,
+            CASE WHEN tc.oid IS NOT NULL THEN (pg_relation_size(tc.oid) / current_setting('block_size')::bigint) ELSE 0 END AS toast_pages,
+            COALESCE(ts.n_live_tup, 0)::bigint AS toast_live_tuples,
+            COALESCE(ts.n_dead_tup, 0)::bigint AS toast_dead_tuples,
+            CASE
+                WHEN tc.oid IS NOT NULL THEN
+                    CEIL(LEAST(
+                        COALESCE(NULLIF(current_setting('autovacuum_vacuum_max_threshold', TRUE), '')::float8, 'Infinity'::float8),
+                        COALESCE(toast_opts.vacuum_threshold, current_setting('autovacuum_vacuum_threshold')::float8)
+                        + COALESCE(toast_opts.vacuum_scale_factor, current_setting('autovacuum_vacuum_scale_factor')::float8)
+                        * COALESCE(ts.n_live_tup, 0)
+                    ))::bigint
+            END AS toast_vacuum_threshold,
             c.relkind,
             c.relispartition
         FROM pg_class c
         JOIN pg_namespace n ON n.oid = c.relnamespace
         LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+        LEFT JOIN pg_class tc ON tc.oid = c.reltoastrelid AND c.reltoastrelid <> 0
+        LEFT JOIN pg_stat_all_tables ts ON ts.relid = tc.oid
+        LEFT JOIN LATERAL (
+            SELECT
+                MAX(option_value::float8) FILTER (WHERE option_name = 'autovacuum_vacuum_threshold') AS vacuum_threshold,
+                MAX(option_value::float8) FILTER (WHERE option_name = 'autovacuum_vacuum_scale_factor') AS vacuum_scale_factor
+            FROM pg_options_to_table(tc.reloptions)
+        ) toast_opts ON TRUE
         WHERE c.relkind IN ('r', 'm', 'p')
           AND n.nspname NOT IN ('pg_catalog', 'information_schema')
           AND n.nspname NOT LIKE 'pg_toast%'
@@ -337,11 +363,14 @@ def table_candidates(
     """
 
 
-
     with connection.cursor() as cursor:
         cursor.execute("SHOW vacuum_freeze_table_age")
         args.vacuum_freeze_table_age = int(cursor.fetchone()[0])
         args.freeze_threshold = int(args.vacuum_freeze_table_age * args.vacuum_freeze_table_age_pct / 100)
+
+        cursor.execute("SELECT to_regprocedure('pg_freespace(regclass,bigint)') IS NOT NULL")
+        args.toast_fsm_available = bool(cursor.fetchone()[0])
+
         cursor.execute(query)
         rows = cursor.fetchall()
         
@@ -349,7 +378,7 @@ def table_candidates(
     candidates: list[TableCandidate] = []
 
     for row in rows:
-        (schema, table, total_bytes, estimated_rows, live_tuples, dead_tuples, modifications, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze, xid_age, relkind, is_partition,) = row
+        (schema, table, total_bytes, estimated_rows, live_tuples, dead_tuples, modifications, last_vacuum, last_autovacuum, last_analyze, last_autoanalyze, xid_age, toast_oid, toast_pages, toast_live_tuples, toast_dead_tuples, toast_vacuum_threshold, relkind, is_partition,) = row
 
         if args.schema and schema != args.schema:
             continue
@@ -372,20 +401,23 @@ def table_candidates(
 
         vacuum_by_age = is_older_than(last_vac, args.max_days, now)
         vacuum_by_ratio = dead_ratio >= args.vacuum_ratio
+        toast_vacuum_due = toast_vacuum_threshold is not None and toast_dead_tuples >= toast_vacuum_threshold
         analyze_by_age = is_older_than(last_ana, args.max_days, now)
 
         analyze_by_ratio = dead_ratio >= args.analyze_ratio
         analyze_mods_ratio = (modifications / live_tuples * 100 if live_tuples > 0 else (100 if modifications > 0 else 0))
-        analyze_by_mods = analyze_mods_ratio >= args.analyze_mods_ratio        
+        analyze_by_mods = analyze_mods_ratio >= args.analyze_mods_ratio
 
         freeze_due = xid_age >= args.freeze_threshold
 
-        vacuum_due = last_vac is None or vacuum_by_age or vacuum_by_ratio
-        analyze_due = (last_ana is None or analyze_by_age or analyze_by_ratio or analyze_by_mods)        
+        vacuum_due = last_vac is None or vacuum_by_age or vacuum_by_ratio or toast_vacuum_due
+        analyze_due = (last_ana is None or analyze_by_age or analyze_by_ratio or analyze_by_mods)
         
         if vacuum_due or analyze_due or freeze_due:
             candidates.append(TableCandidate(schema=schema, table=table, total_bytes=int(total_bytes), estimated_rows=int(estimated_rows), live_tuples=int(live_tuples), dead_tuples=int(dead_tuples),
-                              modifications_since_analyze=int(modifications), last_vacuum=last_vacuum, last_autovacuum=last_autovacuum, last_analyze=last_analyze, last_autoanalyze=last_autoanalyze, xid_age=int(xid_age),))
+                              modifications_since_analyze=int(modifications), last_vacuum=last_vacuum, last_autovacuum=last_autovacuum, last_analyze=last_analyze, last_autoanalyze=last_autoanalyze, xid_age=int(xid_age),
+                              toast_oid=int(toast_oid) if toast_oid is not None else None, toast_pages=int(toast_pages), toast_live_tuples=int(toast_live_tuples), toast_dead_tuples=int(toast_dead_tuples), 
+                              toast_vacuum_threshold=int(toast_vacuum_threshold) if toast_vacuum_threshold is not None else None,))
 
     # Process FREEZE candidates first, prioritizing the oldest XID age.
     # Preserve the existing oldest-VACUUM-first ordering for other candidates.
@@ -394,6 +426,28 @@ def table_candidates(
                     -t.xid_age if t.xid_age >= args.freeze_threshold else 0,
                     earliest_timestamp(t.last_vacuum, t.last_autovacuum,) or datetime.min.replace(tzinfo=timezone.utc),)
                    )    
+
+    # Collect TOAST FSM free space only for verbose diagnostics.
+    # FSM availability does not affect maintenance decisions.
+    if args.verbose and args.toast_fsm_available:
+        try:
+            with connection.cursor() as cursor:
+                for candidate in candidates:
+                    if candidate.toast_oid is None or candidate.toast_pages <= 0:
+                        continue
+
+                    cursor.execute(
+                        "SELECT COALESCE(SUM(pg_freespace(%s::regclass, blkno)), 0)::bigint FROM generate_series(0, %s::bigint - 1) AS blkno",
+                        (candidate.toast_oid, candidate.toast_pages),
+                    )
+                    candidate.toast_fsm_free_bytes = int(cursor.fetchone()[0])
+
+        except psycopg2.Error as exc:
+            logging.warning("TOAST FSM diagnostic unavailable: %s", exc)
+            args.toast_fsm_available = False
+
+            for candidate in candidates:
+                candidate.toast_fsm_free_bytes = None
 
     return candidates[:9999]
 
@@ -456,17 +510,18 @@ def determine_actions(
 
     vacuum_by_age = is_older_than(last_vac, args.max_days, now)
     vacuum_by_ratio = dead_ratio >= args.vacuum_ratio
+    toast_vacuum_due = table.toast_vacuum_threshold is not None and table.toast_dead_tuples >= table.toast_vacuum_threshold
     analyze_by_age = is_older_than(last_ana, args.max_days, now)
 
     analyze_by_ratio = dead_ratio >= args.analyze_ratio
     analyze_mods_ratio = (table.modifications_since_analyze / table.live_tuples * 100 if table.live_tuples > 0 else (100 if table.modifications_since_analyze > 0 else 0))
-    
+
     analyze_by_mods = analyze_mods_ratio >= args.analyze_mods_ratio
     freeze_due = table.xid_age >= args.freeze_threshold
 
-    vacuum_due = last_vac is None or vacuum_by_age or vacuum_by_ratio
+    vacuum_due = last_vac is None or vacuum_by_age or vacuum_by_ratio or toast_vacuum_due
     analyze_due = (last_ana is None or analyze_by_age or analyze_by_ratio or analyze_by_mods)
-
+    
     vacuum_reasons = []
     analyze_reasons = []
 
@@ -477,6 +532,9 @@ def determine_actions(
 
     if vacuum_by_ratio:
         vacuum_reasons.append(f"dead-tuple ratio {dead_ratio:.2f}% >= VACUUM threshold {args.vacuum_ratio}%")
+
+    if toast_vacuum_due:
+        vacuum_reasons.append(f"TOAST dead tuples {table.toast_dead_tuples:,} >= TOAST VACUUM threshold {table.toast_vacuum_threshold:,}") 
 
     if last_ana is None:
         analyze_reasons.append("no previous ANALYZE recorded")
@@ -686,6 +744,21 @@ def main() -> int:
 
             dead_ratio = (table.dead_tuples / (table.live_tuples + table.dead_tuples) * 100 if (table.live_tuples + table.dead_tuples) > 0 else 0)
 
+            if table.toast_oid is None:
+                toast_metrics = "toast=none"
+            else:
+                toast_fsm = (
+                    str(table.toast_fsm_free_bytes)
+                    if table.toast_fsm_free_bytes is not None
+                    else ("unavailable" if not args.toast_fsm_available else "not_scanned")
+                )
+                toast_metrics = (
+                    f"toast_live={table.toast_live_tuples} "
+                    f"toast_dead={table.toast_dead_tuples} "
+                    f"toast_threshold={table.toast_vacuum_threshold} "
+                    f"toast_fsm_free_bytes={toast_fsm}"
+                )
+
             table_check = (
                 f"{table.schema}.{table.table} "
                 f"size={table.total_bytes / 1_000_000_000:.2f} GB "
@@ -693,11 +766,12 @@ def main() -> int:
                 f"live_tuples={table.live_tuples} "
                 f"dead_tuples={table.dead_tuples} "
                 f"dead_ratio={dead_ratio:.2f}% "
+                f"{toast_metrics} "
                 f"modifications={table.modifications_since_analyze} "
                 f"xid_age={table.xid_age} "
                 f"actions={','.join(actions) if actions else 'NONE'}"
             )
-
+            
             if args.verbose:
                 log_info("METRICS", "%s", table_check)
 
