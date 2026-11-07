@@ -62,7 +62,7 @@ PostgreSQL autovacuum is essential for maintaining database health, but DBAs may
 - **Centralized control:** Manages VACUUM, ANALYZE, and FREEZE through a single utility with configurable limits and priorities.
 - **Proactive maintenance:** Identifies tables that may benefit from maintenance before PostgreSQL's normal autovacuum thresholds are reached.
 - **Operational visibility:** Logs maintenance decisions and execution details, giving DBAs insight into what was processed and why.
-- TOAST-aware maintenance: Evaluates TOAST dead tuples independently of parent-table dead-tuple ratios, allowing VACUUM to be triggered when TOAST needs maintenance even if the parent table does not meet its normal threshold.
+- **TOAST-aware maintenance:** Evaluates TOAST dead tuples independently of parent-table dead-tuple ratios, allowing VACUUM to be triggered when TOAST needs maintenance even if the parent table does not meet its normal threshold.
 
 `pg_smartvac` does not replace or disable PostgreSQL autovacuum. It provides an additional layer of control, allowing DBAs to complement native maintenance with their own scheduling policies and operational preferences.
 
